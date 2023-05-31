@@ -686,6 +686,47 @@ vector_sub(PG_FUNCTION_ARGS)
 }
 
 /*
+ * Multiply vectors
+ */
+PGDLLEXPORT PG_FUNCTION_INFO_V1(vector_mul);
+Datum
+vector_mul(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	float	   *ax = a->x;
+	float	   *bx = b->x;
+	Vector	   *result;
+	float	   *rx;
+
+	CheckDims(a, b);
+
+	result = InitVector(a->dim);
+	rx = result->x;
+
+	for (int i = 0, imax = a->dim; i < imax; i++)
+	{
+#if PG_VERSION_NUM >= 120000
+		rx[i] = float4_mul(ax[i], bx[i]);
+#else
+		rx[i] = ax[i] * bx[i];
+
+		if (isinf(rx[i]))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("value out of range: overflow")));
+
+		if (rx[i] == 0 && !(ax[i] == 0 || bx[i] == 0))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("value out of range: underflow")));
+#endif
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
  * Internal helper to compare vectors
  */
 int

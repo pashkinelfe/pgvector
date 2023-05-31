@@ -1,5 +1,6 @@
 ## 0.4.3 (unreleased)
 
+- Added element-wise multiplication for vectors
 - Fixed compilation error when `float8` is pass by reference
 - Fixed compilation error on PowerPC
 - Fixed segmentation fault with index creation on i386

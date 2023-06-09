@@ -108,6 +108,14 @@ float_overflow_error(void)
 			(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 			 errmsg("value out of range: overflow")));
 }
+
+static pg_noinline void
+float_underflow_error(void)
+{
+	ereport(ERROR,
+			(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+			 errmsg("value out of range: underflow")));
+}
 #endif
 
 /*
@@ -704,23 +712,23 @@ vector_mul(PG_FUNCTION_ARGS)
 	result = InitVector(a->dim);
 	rx = result->x;
 
+	/* Auto-vectorized */
 	for (int i = 0, imax = a->dim; i < imax; i++)
-	{
-#if PG_VERSION_NUM >= 120000
-		rx[i] = float4_mul(ax[i], bx[i]);
-#else
 		rx[i] = ax[i] * bx[i];
 
+	for (int i = 0, imax = a->dim; i < imax; i++)
+	{
 		if (isinf(rx[i]))
-			ereport(ERROR,
-					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-					 errmsg("value out of range: overflow")));
+		{
+			pfree(result);
+			float_overflow_error();
+		}
 
 		if (rx[i] == 0 && !(ax[i] == 0 || bx[i] == 0))
-			ereport(ERROR,
-					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-					 errmsg("value out of range: underflow")));
-#endif
+		{
+			pfree(result);
+			float_underflow_error();
+		}
 	}
 
 	PG_RETURN_POINTER(result);

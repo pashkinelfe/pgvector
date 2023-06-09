@@ -716,6 +716,7 @@ vector_mul(PG_FUNCTION_ARGS)
 	for (int i = 0, imax = a->dim; i < imax; i++)
 		rx[i] = ax[i] * bx[i];
 
+	/* Check for overflow and underflow */
 	for (int i = 0, imax = a->dim; i < imax; i++)
 	{
 		if (isinf(rx[i]))

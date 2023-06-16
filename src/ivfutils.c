@@ -131,8 +131,13 @@ IvfflatInitPage(Buffer buf, Page page)
 void
 IvfflatInitRegisterPage(Relation index, Buffer *buf, Page *page, GenericXLogState **state)
 {
+#if PG_VERSION_NUM < 120000
 	*state = GenericXLogStart(index);
 	*page = GenericXLogRegisterBuffer(*state, *buf, GENERIC_XLOG_FULL_IMAGE);
+#else
+	*state = NULL;
+	*page = BufferGetPage(*buf);
+#endif
 	IvfflatInitPage(*buf, *page);
 }
 
@@ -143,7 +148,8 @@ void
 IvfflatCommitBuffer(Buffer buf, GenericXLogState *state)
 {
 	MarkBufferDirty(buf);
-	GenericXLogFinish(state);
+	if (state != NULL)
+		GenericXLogFinish(state);
 	UnlockReleaseBuffer(buf);
 }
 
@@ -157,7 +163,12 @@ IvfflatAppendPage(Relation index, Buffer *buf, Page *page, GenericXLogState **st
 {
 	/* Get new buffer */
 	Buffer		newbuf = IvfflatNewBuffer(index, forkNum);
-	Page		newpage = GenericXLogRegisterBuffer(*state, newbuf, GENERIC_XLOG_FULL_IMAGE);
+	Page		newpage;
+
+	if (*state == NULL)
+		newpage = BufferGetPage(newbuf);
+	else
+		newpage = GenericXLogRegisterBuffer(*state, newbuf, GENERIC_XLOG_FULL_IMAGE);
 
 	/* Update the previous buffer */
 	IvfflatPageGetOpaque(*page)->nextblkno = BufferGetBlockNumber(newbuf);
@@ -168,13 +179,19 @@ IvfflatAppendPage(Relation index, Buffer *buf, Page *page, GenericXLogState **st
 	/* Commit */
 	MarkBufferDirty(*buf);
 	MarkBufferDirty(newbuf);
-	GenericXLogFinish(*state);
+	if (*state != NULL)
+		GenericXLogFinish(*state);
 
 	/* Unlock */
 	UnlockReleaseBuffer(*buf);
 
-	*state = GenericXLogStart(index);
-	*page = GenericXLogRegisterBuffer(*state, newbuf, GENERIC_XLOG_FULL_IMAGE);
+	if (*state == NULL)
+		*page = BufferGetPage(newbuf);
+	else
+	{
+		*state = GenericXLogStart(index);
+		*page = GenericXLogRegisterBuffer(*state, newbuf, GENERIC_XLOG_FULL_IMAGE);
+	}
 	*buf = newbuf;
 }
 
@@ -193,8 +210,13 @@ IvfflatUpdateList(Relation index, GenericXLogState *state, ListInfo listInfo,
 
 	buf = ReadBufferExtended(index, forkNum, listInfo.blkno, RBM_NORMAL, NULL);
 	LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
-	state = GenericXLogStart(index);
-	page = GenericXLogRegisterBuffer(state, buf, 0);
+	if (state == NULL)
+		page = BufferGetPage(buf);
+	else
+	{
+		state = GenericXLogStart(index);
+		page = GenericXLogRegisterBuffer(state, buf, 0);
+	}
 	list = (IvfflatList) PageGetItem(page, PageGetItemId(page, listInfo.offno));
 
 	if (BlockNumberIsValid(insertPage) && insertPage != list->insertPage)
@@ -219,7 +241,8 @@ IvfflatUpdateList(Relation index, GenericXLogState *state, ListInfo listInfo,
 		IvfflatCommitBuffer(buf, state);
 	else
 	{
-		GenericXLogAbort(state);
+		if (state != NULL)
+			GenericXLogAbort(state);
 		UnlockReleaseBuffer(buf);
 	}
 }

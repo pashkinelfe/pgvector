@@ -319,6 +319,11 @@ InsertTuples(Relation index, IvfflatBuildState * buildstate, ForkNumber forkNum)
 		/* Set the start and insert pages */
 		IvfflatUpdateList(index, state, buildstate->listInfo[i], insertPage, InvalidBlockNumber, startPage, forkNum);
 	}
+
+#if PG_VERSION_NUM >= 120000
+	if (RelationNeedsWAL(index))
+		log_newpage_range(index, forkNum, 0, RelationGetNumberOfBlocks(index), true);
+#endif
 }
 
 /*

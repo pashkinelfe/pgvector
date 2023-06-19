@@ -648,6 +648,32 @@ vector_spherical_distance(PG_FUNCTION_ARGS)
 }
 
 /*
+ * Get the L1 distance between vectors
+ */
+PGDLLEXPORT PG_FUNCTION_INFO_V1(l1_distance);
+Datum
+l1_distance(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	float	   *ax = a->x;
+	float	   *bx = b->x;
+	double		distance = 0.0;
+	double		diff;
+
+	CheckDims(a, b);
+
+	/* Auto-vectorized */
+	for (int i = 0; i < a->dim; i++)
+	{
+		diff = ax[i] - bx[i];
+		distance += fabs(diff);
+	}
+
+	PG_RETURN_FLOAT8(distance);
+}
+
+/*
  * Get the dimensions of a vector
  */
 PGDLLEXPORT PG_FUNCTION_INFO_V1(vector_dims);

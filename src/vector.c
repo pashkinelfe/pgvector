@@ -720,16 +720,10 @@ vector_mul(PG_FUNCTION_ARGS)
 	for (int i = 0, imax = a->dim; i < imax; i++)
 	{
 		if (isinf(rx[i]))
-		{
-			pfree(result);
 			float_overflow_error();
-		}
 
 		if (rx[i] == 0 && !(ax[i] == 0 || bx[i] == 0))
-		{
-			pfree(result);
 			float_underflow_error();
-		}
 	}
 
 	PG_RETURN_POINTER(result);

@@ -630,21 +630,27 @@ vector_spherical_distance(PG_FUNCTION_ARGS)
 {
 	Vector	   *a = PG_GETARG_VECTOR_P(0);
 	Vector	   *b = PG_GETARG_VECTOR_P(1);
-	double		distance = 0.0;
+	double		dp = 0.0,
+			distance;
+	bool negate;
 
 	CheckDims(a, b);
 
 	/* Auto-vectorized */
 	for (int i = 0; i < a->dim; i++)
-		distance += a->x[i] * b->x[i];
+		dp += a->x[i] * b->x[i];
+
+	negate = (dp < 0);
+	dp = fabs(dp);
 
 	/* Prevent NaN with acos with loss of precision */
-	if (distance > 1)
-		distance = 1;
-	else if (distance < -1)
-		distance = -1;
+	if (dp > 1)
+		dp = 1;
 
-	PG_RETURN_FLOAT8(acos(distance) / M_PI);
+	distance = negate ?
+		0.5 - dp*(dp*(dp*(dp*(-2.16311852596*dp+4.18564873933)-2.94603025934)+0.8201926488)-0.39669260385):
+		0.5 + dp*(dp*(dp*(dp*(-2.16311852596*dp+4.18564873933)-2.94603025934)+0.8201926488)-0.39669260385);
+	PG_RETURN_FLOAT8(distance);
 }
 
 /*
